@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1120">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Muelle interactivo — Fuerza, energía, rozamiento y velocidad</title>
+<style>
+  *{ box-sizing:border-box; }
+
+  :root{
+    --bg:#0b1120;
+    --panel:rgba(30,41,59,.72);
+    --border:rgba(148,163,184,.16);
+    --cyan:#38bdf8;
+    --pink:#f472b6;
+    --amber:#fbbf24;
+    --green:#4ade80;
+    --red:#f87171;
+    --violet:#a78bfa;
+    --txt:#e2e8f0;
+    --muted:#94a3b8;
+
+    /* Safe areas con fallback a 0 */
+    --sa-top: env(safe-area-inset-top, 0px);
+    --sa-right: env(safe-area-inset-right, 0px);
+    --sa-bottom: env(safe-area-inset-bottom, 0px);
+    --sa-left: env(safe-area-inset-left, 0px);
+  }
+
+  html{
+    height:100%;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+
+  body{
+    margin:0;
+    padding:
+      calc(18px + var(--sa-top))
+      calc(16px + var(--sa-right))
+      calc(36px + var(--sa-bottom))
+      calc(16px + var(--sa-left));
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:var(--txt);
+    background:
+      radial-gradient(1100px 700px at 15% -10%, #1e293b 0%, transparent 60%),
+      radial-gradient(900px 600px at 95% 0%, #172554 0%, transparent 55%),
+      var(--bg) fixed;
+    min-height:100vh;
+    min-height:100dvh;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+
+  .app{ max-width:1180px; margin:0 auto; }
+
+  header h1{
+    margin:0 0 6px;
+    font-size:clamp(1.15rem, 4.5vw, 1.9rem);
+    line-height:1.2;
+    letter-spacing:-.02em;
+    background:linear-gradient(90deg,#e2e8f0,#7dd3fc);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  header p{
+    margin:0 0 18px;
+    color:var(--muted);
+    font-size:clamp(.82rem, 2.4vw, .93rem);
+    max-width:820px;
+    line-height:1.5;
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    gap:14px;
+    align-items:start;
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+
+  .stage-panel{
+    grid-column:1 / -1;
+    padding:8px;
+    overflow:hidden;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+
+  #springCanvas{
+    display:block;
+    width:100%;
+    height:340px;
+    touch-action:none;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    cursor:grab;
+    border-radius:12px;
+  }
+
+  .readouts{
+    grid-column:1 / -1;
+    display:grid;
+    grid-template-columns:repeat(5, minmax(0, 1fr));
+    gap:12px;
+  }
+
+  .card{
+    background:linear-gradient(180deg, rgba(15,23,42,.85), rgba(15,23,42,.5));
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:11px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    min-width:0;
+  }
+  .card .label{
+    font-size:clamp(.6rem, 1.6vw, .68rem);
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:600;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .card .value{
+    font-size:clamp(.92rem, 2.6vw, 1.35rem);
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-.02em;
+  }
+  .card.x .value{ color:var(--cyan); }
+  .card.f .value{ color:var(--pink); }
+  .card.e .value{ color:var(--amber); }
+  .card.t .value{ color:var(--green); }
+  .card.w .value{ color:var(--red); }
+
+  .controls{ grid-column:1; min-width:0; }
+  .graph-panel{ grid-column:2; padding:8px 10px 4px; min-width:0; }
+
+  #graphCanvas{
+    display:block;
+    width:100%;
+    height:250px;
+    touch-action: manipulation;
+  }
+
+  .ctl{ margin-bottom:16px; }
+  .ctl:last-of-type{ margin-bottom:8px; }
+
+  .ctl .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:6px;
+  }
+  .ctl label{
+    font-size:.82rem;
+    font-weight:600;
+    color:#cbd5e1;
+  }
+  .ctl output{
+    font-size:.85rem;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    color:var(--cyan);
+  }
+  .ctl.k output{ color:#a5b4fc; }
+  .ctl.c output{ color:var(--green); }
+  .ctl.s output{ color:var(--violet); }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:8px;
+    border-radius:4px;
+    background:linear-gradient(90deg,#334155,#475569);
+    outline:none;
+    margin:4px 0 0;
+    cursor:pointer;
+    touch-action: manipulation;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--cyan);
+    border:3px solid #0b1120;
+    box-shadow:0 0 0 2px var(--cyan), 0 2px 8px rgba(0,0,0,.6);
+    transition:transform .12s;
+    cursor:grab;
+  }
+  input[type=range]::-webkit-slider-thumb:active{ cursor:grabbing; transform:scale(1.1); }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px;
+    border-radius:50%;
+    background:var(--cyan);
+    border:3px solid #0b1120;
+    box-shadow:0 0 0 2px var(--cyan);
+    cursor:grab;
+  }
+  input[type=range]::-moz-range-track{
+    height:8px; border-radius:4px; background:#334155;
+  }
+
+  #cSlider::-webkit-slider-thumb{ background:var(--green); box-shadow:0 0 0 2px var(--green); }
+  #cSlider::-moz-range-thumb{ background:var(--green); box-shadow:0 0 0 2px var(--green); }
+
+  #sSlider::-webkit-slider-thumb{ background:var(--violet); box-shadow:0 0 0 2px var(--violet); }
+  #sSlider::-moz-range-thumb{ background:var(--violet); box-shadow:0 0 0 2px var(--violet); }
+
+  .buttons{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:18px;
+  }
+
+  button{
+    padding:11px 12px;
+    border-radius:11px;
+    border:1px solid rgba(148,163,184,.25);
+    background:#1e293b;
+    color:var(--txt);
+    font-weight:700;
+    font-size:.85rem;
+    font-family:inherit;
+    cursor:pointer;
+    transition: background .15s ease, transform .15s ease, border-color .15s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 42px;
+  }
+  button:hover{
+    background:#273449;
+    border-color:var(--cyan);
+    transform:translateY(-1px);
+  }
+  button:active{ transform:translateY(0); }
+  button:focus-visible{
+    outline:2px solid var(--cyan);
+    outline-offset:2px;
+  }
+
+  button.primary{
+    background:linear-gradient(135deg,#0ea5e9,#38bdf8);
+    border-color:transparent;
+    color:#04121f;
+    grid-column:1 / -1;
+  }
+  button.primary:hover{
+    background:linear-gradient(135deg,#38bdf8,#7dd3fc);
+  }
+
+  .presets{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .presets button{
+    flex:1;
+    font-size:.78rem;
+    padding:9px 6px;
+    min-width:0;
+  }
+  .presets button.active{
+    background:linear-gradient(135deg,#16a34a,#4ade80);
+    border-color:transparent;
+    color:#04121f;
+  }
+
+  /* Fila única de botones de velocidad */
+  .speed-row{
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:6px;
+    margin-top:10px;
+  }
+  .speed-row .speedbtn{
+    padding:8px 2px;
+    font-size:.72rem;
+    line-height:1.1;
+    border-radius:9px;
+    background:#0f172a;
+    border:1px solid rgba(148,163,184,.22);
+    color:var(--muted);
+    white-space:nowrap;
+    min-width:0;
+    min-height:36px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .speed-row .speedbtn.active{
+    background:linear-gradient(135deg,#7c3aed,#a78bfa);
+    border-color:transparent;
+    color:#0b1120;
+  }
+  .speed-row .speedbtn:hover{
+    border-color:var(--violet);
+    transform:translateY(-1px);
+  }
+
+  .note{
+    margin-top:16px;
+    padding-top:14px;
+    border-top:1px dashed rgba(148,163,184,.22);
+    font-size:.75rem;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  .note b{ color:#cbd5e1; }
+  .note code{
+    font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+    color:#7dd3fc;
+    font-size:.74rem;
+    word-break: break-word;
+  }
+
+  /* ============================================================
+     RESPONSIVE — TABLETS
+     ============================================================ */
+  @media (max-width: 1000px){
+    .readouts{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  }
+
+  /* ============================================================
+     RESPONSIVE — MÓVILES / TABLETS PEQUEÑAS (una columna)
+     ============================================================ */
+  @media (max-width: 720px){
+    .layout{
+      grid-template-columns:minmax(0, 1fr);
+      gap:12px;
+    }
+    .controls, .graph-panel{ grid-column:1; }
+    #springCanvas{ height:280px; }
+    #graphCanvas{ height:230px; }
+    .readouts{ grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+  }
+
+  @media (max-width: 560px){
+    body{ padding:
+      calc(14px + var(--sa-top))
+      calc(12px + var(--sa-right))
+      calc(28px + var(--sa-bottom))
+      calc(12px + var(--sa-left));
+    }
+    .readouts{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+    .card{ padding:10px 12px; border-radius:12px; }
+    .card .label{ font-size:.6rem; }
+    #springCanvas{ height:250px; }
+    #graphCanvas{ height:210px; }
+    .panel{ border-radius:14px; padding:12px; }
+    .buttons{ gap:8px; }
+  }
+
+  @media (max-width: 380px){
+    #springCanvas{ height:220px; }
+    #graphCanvas{ height:195px; }
+    .speed-row .speedbtn{ font-size:.62rem; padding:6px 1px; min-height:34px; }
+    .presets button{ font-size:.72rem; padding:8px 4px; }
+  }
+
+  /* ============================================================
+     RESPONSIVE — MÓVILES EN HORIZONTAL (poca altura)
+     ============================================================ */
+  @media (orientation: landscape) and (max-height: 520px){
+    body{ padding-top: calc(10px + var(--sa-top)); }
+    header p{ display:none; }
+    header h1{ font-size:1.05rem; margin-bottom:12px; }
+    #springCanvas{ height:190px; }
+    #graphCanvas{ height:170px; }
+    .ctl{ margin-bottom:12px; }
+    .note{ display:none; }
+  }
+
+  /* ============================================================
+     DISPOSITIVOS TÁCTILES — objetivos más grandes
+     ============================================================ */
+  @media (hover: none) and (pointer: coarse){
+    button{ min-height:46px; font-size:.9rem; }
+    .speed-row .speedbtn{ min-height:42px; padding:9px 2px; font-size:.75rem; }
+    .presets button{ min-height:46px; }
+    input[type=range]::-webkit-slider-thumb{ width:26px; height:26px; }
+    input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
+    .ctl{ margin-bottom:20px; }
+  }
+
+  /* ============================================================
+     ACCESIBILIDAD — usuarios que prefieren menos animaciones
+     ============================================================ */
+  @media (prefers-reduced-motion: reduce){
+    *{
+      animation-duration:.001ms !important;
+      transition-duration:.001ms !important;
+    }
+    button:hover{ transform:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Muelle interactivo: fuerza, energía, rozamiento y velocidad</h1>
+    <p>Arrastra el bloque para deformar el muelle. Ajusta <b>k</b>, el rozamiento <b>c</b> y la <b>velocidad de simulación</b>. Pulsa <b>Liberar</b> para ver la oscilación y comprueba cómo la energía disipada por rozamiento (Wᵣ) crece hasta igualar la energía inicial.</p>
+  </header>
+
+  <div class="layout">
+
+    <section class="panel stage-panel">
+      <canvas id="springCanvas" aria-label="Simulación del muelle"></canvas>
+    </section>
+
+    <div class="readouts">
+      <div class="card x">
+        <span class="label">Deformación · x</span>
+        <span class="value" id="valX">0.00 m</span>
+      </div>
+      <div class="card f">
+        <span class="label">Fuerza · F = −k·x</span>
+        <span class="value" id="valF">0.0 N</span>
+      </div>
+      <div class="card e">
+        <span class="label">Energía potencial · ½kx²</span>
+        <span class="value" id="valE">0.00 J</span>
+      </div>
+      <div class="card t">
+        <span class="label">Energía total · E + ½mv²</span>
+        <span class="value" id="valT">0.00 J</span>
+      </div>
+      <div class="card w">
+        <span class="label">Energía perdida · Wᵣ = ∫c·v²dt</span>
+        <span class="value" id="valW">0.00 J</span>
+      </div>
+    </div>
+
+    <section class="panel controls">
+      <div class="ctl k">
+        <div class="row">
+          <label for="kSlider">Constante elástica k</label>
+          <output id="outK">100 N/m</output>
+        </div>
+        <input type="range" id="kSlider" min="20" max="300" step="5" value="100">
+      </div>
+
+      <div class="ctl c">
+        <div class="row">
+          <label for="cSlider">Rozamiento · c</label>
+          <output id="outC">0.0 kg/s</output>
+        </div>
+        <input type="range" id="cSlider" min="0" max="10" step="0.1" value="0">
+      </div>
+
+      <div class="ctl s">
+        <div class="row">
+          <label for="sSlider">Velocidad de simulación</label>
+          <output id="outS">1.0×</output>
+        </div>
+        <input type="range" id="sSlider" min="0.05" max="2" step="0.05" value="1">
+        <div class="speed-row" id="speedPresets">
+          <button class="speedbtn" data-speed="0.1">0.1×</button>
+          <button class="speedbtn" data-speed="0.25">0.25×</button>
+          <button class="speedbtn" data-speed="0.5">0.5×</button>
+          <button class="speedbtn active" data-speed="1">1×</button>
+          <button class="speedbtn" data-speed="1.5">1.5×</button>
+          <button class="speedbtn" data-speed="2">2×</button>
+        </div>
+      </div>
+
+      <div class="presets">
+        <button id="presetIdeal" class="active">Sin rozamiento</button>
+        <button id="presetReal">Con rozamiento</button>
+      </div>
+
+      <div class="ctl" style="margin-top:16px;">
+        <div class="row">
+          <label for="xSlider">Deformación inicial x₀</label>
+          <output id="outX">0.00 m</output>
+        </div>
+        <input type="range" id="xSlider" min="-0.5" max="0.5" step="0.005" value="0">
+      </div>
+
+      <div class="buttons">
+        <button class="primary" id="releaseBtn">▶ Liberar el bloque</button>
+        <button id="stopBtn">■ Detener</button>
+        <button id="resetBtn">↺ Reiniciar</button>
+      </div>
+
+      <p class="note">
+        <b>Ley de Hooke:</b> <code>F = −k·x</code><br>
+        <b>Movimiento:</b> <code>m·x'' = −k·x − c·x'</code><br><br>
+        <b>Energía disipada:</b> <code>Wᵣ = ∫ c·v² dt</code>. Es el trabajo (negativo) hecho
+        por la fuerza de rozamiento. Con <code>c = 0</code> permanece en 0; con
+        <code>c &gt; 0</code> crece monótonamente hasta igualar la energía mecánica inicial,
+        que es cuando el bloque se detiene.<br><br>
+        <b>Balance energético:</b> <code>E_inicial = E_total + Wᵣ</code>.
+      </p>
+    </section>
+
+    <section class="panel graph-panel">
+      <canvas id="graphCanvas" aria-label="Gráfica de energía potencial elástica"></canvas>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ============================ Estado ============================ */
+  const M = 1;
+
+  const state = {
+    k: 100,
+    c: 0,
+    x: 0,
+    v: 0,
+    x0: 0,
+    xMax: 0.5,
+    speed: 1,
+    Wr: 0,
+    Einicial: 0,
+    dragging: false,
+    animating: false
+  };
+
+  /* ============================ DOM ============================ */
+  const springCanvas = document.getElementById('springCanvas');
+  const sctx = springCanvas.getContext('2d');
+  const graphCanvas = document.getElementById('graphCanvas');
+  const gctx = graphCanvas.getContext('2d');
+
+  const kSlider  = document.getElementById('kSlider');
+  const cSlider  = document.getElementById('cSlider');
+  const sSlider  = document.getElementById('sSlider');
+  const xSlider  = document.getElementById('xSlider');
+  const outK     = document.getElementById('outK');
+  const outC     = document.getElementById('outC');
+  const outS     = document.getElementById('outS');
+  const outX     = document.getElementById('outX');
+  const valX     = document.getElementById('valX');
+  const valF     = document.getElementById('valF');
+  const valE     = document.getElementById('valE');
+  const valT     = document.getElementById('valT');
+  const valW     = document.getElementById('valW');
+  const releaseBtn = document.getElementById('releaseBtn');
+  const stopBtn    = document.getElementById('stopBtn');
+  const resetBtn   = document.getElementById('resetBtn');
+  const presetIdeal = document.getElementById('presetIdeal');
+  const presetReal  = document.getElementById('presetReal');
+  const speedBtns   = document.querySelectorAll('#speedPresets .speedbtn');
+
+  /* ======================= Utilidades canvas ======================= */
+  let sw = 0, sh = 0, gw = 0, gh = 0;
+
+  function resizeCanvases(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Escenario
+    const newSW = Math.max(1, springCanvas.clientWidth  || 600);
+    const newSH = Math.max(1, springCanvas.clientHeight || 300);
+    if (newSW !== sw || newSH !== sh){
+      sw = newSW; sh = newSH;
+      springCanvas.width  = Math.round(sw * dpr);
+      springCanvas.height = Math.round(sh * dpr);
+    }
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Gráfica
+    const newGW = Math.max(1, graphCanvas.clientWidth  || 500);
+    const newGH = Math.max(1, graphCanvas.clientHeight || 250);
+    if (newGW !== gw || newGH !== gh){
+      gw = newGW; gh = newGH;
+      graphCanvas.width  = Math.round(gw * dpr);
+      graphCanvas.height = Math.round(gh * dpr);
+    }
+    gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    r = Math.min(r, w/2, h/2);
+    if (r < 0) r = 0;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y,     x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x,     y + h, r);
+    ctx.arcTo(x,     y + h, x,     y,     r);
+    ctx.arcTo(x,     y,     x + w, y,     r);
+    ctx.closePath();
+  }
+
+  function arrowLine(ctx, x1, y1, x2, y2, color, lw){
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.6) return;
+    const ang  = Math.atan2(dy, dx);
+    const head = Math.min(12, len * 0.55);
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2 - Math.cos(ang) * head * 0.9, y2 - Math.sin(ang) * head * 0.9);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - head * Math.cos(ang - 0.42), y2 - head * Math.sin(ang - 0.42));
+    ctx.lineTo(x2 - head * Math.cos(ang + 0.42), y2 - head * Math.sin(ang + 0.42));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSpring(ctx, x1, x2, cy, maxAmp, coils){
+    const len = x2 - x1;
+    if (len <= 6) return;
+
+    const lead = Math.min(14, len * 0.09);
+    const body = Math.max(1, len - 2 * lead);
+    const amp  = Math.min(maxAmp, body / (coils * 2.4));
+    const n    = coils * 2;
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap  = 'round';
+    ctx.lineWidth = Math.max(2.5, Math.min(4, amp * 0.22));
+    ctx.strokeStyle = '#94a3b8';
+    ctx.shadowColor = 'rgba(148,163,184,.35)';
+    ctx.shadowBlur = 6;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, cy);
+    ctx.lineTo(x1 + lead, cy);
+    for (let i = 1; i <= n; i++){
+      const px = x1 + lead + body * i / n;
+      const py = cy + (i % 2 ? -amp : amp);
+      ctx.lineTo(px, py);
+    }
+    ctx.lineTo(x2, cy);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ====================== Geometría del escenario ====================== */
+  let geo = { cy:0, wallX:0, restEndX:0, blockW:54, blockH:62, blockX:0, scale:1, floorY:0 };
+
+  function computeGeo(){
+    // Escala de bloque y elementos según tamaño del lienzo
+    const blockW = Math.max(34, Math.min(58, sw * 0.085));
+    const blockH = blockW * 1.14;
+    const floorY = sh - Math.max(48, sh * 0.17);
+    const cy     = floorY - blockH / 2;
+
+    let L0 = (sw - 112) / 1.4;
+    L0 = Math.max(60, Math.min(240, L0));
+
+    const used   = 18 + 1.4 * L0 + blockW;
+    const startX = Math.max(14, (sw - used) / 2);
+    const wallX  = startX + 18;
+
+    const restEndX = wallX + L0;
+    const scale    = 0.8 * L0;
+    const blockX   = restEndX + state.x * scale;
+
+    geo = { cy, wallX, restEndX, blockW, blockH, blockX, scale, floorY };
+  }
+
+  /* ========================= Dibuja el muelle ========================= */
+  function drawStage(){
+    computeGeo();
+
+    const ctx = sctx;
+    ctx.clearRect(0, 0, sw, sh);
+
+    const { cy, wallX, restEndX, blockW, blockH, floorY, scale } = geo;
+    const bx    = restEndX + state.x * scale;
+    const bcx   = bx + blockW / 2;
+    const restCX = restEndX + blockW / 2;
+
+    /* --- suelo --- */
+    const floorGrad = ctx.createLinearGradient(0, floorY - 6, 0, floorY + 12);
+    floorGrad.addColorStop(0, 'rgba(148,163,184,.35)');
+    floorGrad.addColorStop(1, 'rgba(148,163,184,0)');
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(10, floorY, sw - 20, 14);
+
+    ctx.strokeStyle = 'rgba(148,163,184,.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(12, floorY);
+    ctx.lineTo(sw - 12, floorY);
+    ctx.stroke();
+
+    /* --- rugosidad visual --- */
+    if (state.c > 0.05){
+      ctx.save();
+      ctx.strokeStyle = 'rgba(74,222,128,' + Math.min(0.55, state.c / 12) + ')';
+      ctx.lineWidth = 1.6;
+      const n = Math.min(40, Math.round(state.c * 4));
+      for (let i = 0; i < n; i++){
+        const px = 20 + (sw - 40) * (i / Math.max(1, n - 1));
+        ctx.beginPath();
+        ctx.moveTo(px, floorY + 2);
+        ctx.lineTo(px + 5, floorY + 8);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /* --- pared de anclaje --- */
+    const wallTop = floorY - Math.min(170, sh * 0.62);
+    ctx.save();
+    ctx.fillStyle = '#334155';
+    roundRect(ctx, wallX - 18, wallTop, 18, floorY - wallTop, 4);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(148,163,184,.35)';
+    ctx.lineWidth = 1.5;
+    for (let y = wallTop + 6; y < floorY - 2; y += 11){
+      ctx.beginPath();
+      ctx.moveTo(wallX - 18, y);
+      ctx.lineTo(wallX, Math.min(y + 11, floorY));
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(148,163,184,.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(wallX, wallTop);
+    ctx.lineTo(wallX, floorY);
+    ctx.stroke();
+    ctx.restore();
+
+    /* --- referencia de reposo --- */
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(148,163,184,.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(restCX, cy - blockH / 2 - 14);
+    ctx.lineTo(restCX, floorY + 26);
+    ctx.stroke();
+    ctx.restore();
+
+    /* --- muelle --- */
+    drawSpring(ctx, wallX, bx, cy, 21, 13);
+
+    /* --- bloque --- */
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.55)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 6;
+    const bGrad = ctx.createLinearGradient(bx, cy - blockH/2, bx, cy + blockH/2);
+    bGrad.addColorStop(0, '#38bdf8');
+    bGrad.addColorStop(1, '#0369a1');
+    ctx.fillStyle = bGrad;
+    roundRect(ctx, bx, cy - blockH / 2, blockW, blockH, 9);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(186,230,253,.85)';
+    ctx.lineWidth = 1.6;
+    roundRect(ctx, bx, cy - blockH / 2, blockW, blockH, 9);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.globalAlpha = .18;
+    ctx.fillStyle = '#ffffff';
+    roundRect(ctx, bx + 5, cy - blockH/2 + 5, blockW - 10, blockH * 0.34, 6);
+    ctx.fill();
+    ctx.restore();
+
+    /* --- flecha de fuerza del muelle --- */
+    const F = -state.k * state.x;
+    if (Math.abs(F) >= 0.5){
+      const dir = F > 0 ? 1 : -1;
+      const len = Math.max(16, Math.min(155, Math.abs(F) * 0.93));
+      const ay  = cy - blockH / 2 - 38;
+
+      arrowLine(ctx, bcx, ay, bcx + dir * len, ay, '#f472b6', 4);
+
+      ctx.fillStyle = '#f472b6';
+      ctx.font = '700 14px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = dir > 0 ? 'left' : 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('F = ' + F.toFixed(1) + ' N', bcx + dir * (len + 9), ay + 6);
+    } else {
+      ctx.fillStyle = 'rgba(244,114,182,.75)';
+      ctx.font = '700 13px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('F = 0 N  (equilibrio)', bcx, cy - blockH / 2 - 26);
+    }
+
+    /* --- flecha de rozamiento --- */
+    if (state.c > 0.05 && Math.abs(state.v) > 0.01){
+      const Fd = -state.c * state.v;
+      const dir = Fd > 0 ? 1 : -1;
+      const len = Math.max(12, Math.min(90, Math.abs(Fd) * 6));
+      const ay  = cy + blockH / 2 + 22;
+
+      arrowLine(ctx, bcx, ay, bcx + dir * len, ay, '#4ade80', 3);
+
+      ctx.fillStyle = '#4ade80';
+      ctx.font = '700 12px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = dir > 0 ? 'left' : 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText('Fᵣ = ' + Fd.toFixed(1) + ' N', bcx + dir * (len + 8), ay - 4);
+    }
+
+    /* --- indicador de deformación --- */
+    if (Math.abs(state.x) > 0.004){
+      const y = floorY + 20;
+      arrowLine(ctx, restCX, y, bcx, y, '#38bdf8', 2);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '700 13px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('x = ' + state.x.toFixed(2) + ' m', (restCX + bcx) / 2, y - 7);
+    }
+
+    /* --- etiquetas --- */
+    ctx.fillStyle = 'rgba(148,163,184,.9)';
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const estado = state.animating
+      ? (state.c === 0 ? 'OSCILANDO (sin rozamiento)' : 'OSCILANDO (amortiguado)')
+      : (state.x > 0.004 ? 'ESTIRADO'
+        : state.x < -0.004 ? 'COMPRIMIDO'
+        : 'EN EQUILIBRIO');
+    ctx.fillText(estado, 16, 14);
+
+    // Etiqueta derecha (puede omitirse en lienzos muy estrechos)
+    if (sw > 380){
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(148,163,184,.65)';
+      ctx.fillText(
+        'k = ' + state.k + ' N/m  ·  c = ' + state.c.toFixed(1) + ' kg/s  ·  ' + state.speed.toFixed(2) + '×',
+        sw - 16, 14
+      );
+    }
+
+    /* --- indicador de velocidad --- */
+    if (state.speed !== 1 && sw > 300){
+      ctx.save();
+      ctx.fillStyle = state.speed < 1 ? 'rgba(167,139,250,.85)' : 'rgba(251,191,36,.9)';
+      ctx.font = '700 12px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText((state.speed < 1 ? '⏱ ' : '⏩ ') + state.speed.toFixed(2) + '×', sw - 16, sh - 12);
+      ctx.restore();
+    }
+
+    /* --- barra de progreso de disipación --- */
+    if (state.c > 0 && state.Einicial > 0.0001 && sw > 300){
+      const frac = Math.min(1, state.Wr / state.Einicial);
+      const barW = Math.min(130, sw * 0.32), barH = 8;
+      const barX = 16, barY = sh - 22;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(15,23,42,.85)';
+      roundRect(ctx, barX - 2, barY - 2, barW + 4, barH + 4, 5);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(148,163,184,.25)';
+      roundRect(ctx, barX, barY, barW, barH, 4);
+      ctx.fill();
+
+      const g = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+      g.addColorStop(0, '#f87171');
+      g.addColorStop(1, '#fb923c');
+      ctx.fillStyle = g;
+      roundRect(ctx, barX, barY, Math.max(2, barW * frac), barH, 4);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(226,232,240,.85)';
+      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('Disipado: ' + (frac * 100).toFixed(0) + '%', barX, barY - 3);
+      ctx.restore();
+    }
+  }
+
+  /* ========================= Dibuja la gráfica ========================= */
+  function drawGraph(){
+    const ctx = gctx;
+    ctx.clearRect(0, 0, gw, gh);
+
+    const padL = Math.min(56, gw * 0.15), padR = Math.min(22, gw * 0.07);
+    const padT = 34, padB = 42;
+    const plotW = Math.max(20, gw - padL - padR);
+    const plotH = Math.max(20, gh - padT - padB);
+
+    const xm   = state.xMax;
+    const Emax = 0.5 * state.k * xm * xm;
+
+    const X = x => padL + (x + xm) / (2 * xm) * plotW;
+    const Y = E => padT + plotH - (E / Emax) * plotH;
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 12px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    if (gw > 260){
+      ctx.fillText('Energía potencial elástica   E = ½·k·x²', padL, 20);
+    } else {
+      ctx.fillText('E = ½·k·x²', padL, 20);
+    }
+
+    ctx.strokeStyle = 'rgba(148,163,184,.10)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++){
+      const gx = padL + plotW * i / 4;
+      ctx.beginPath(); ctx.moveTo(gx, padT); ctx.lineTo(gx, padT + plotH); ctx.stroke();
+    }
+    for (let i = 0; i <= 4; i++){
+      const gy = padT + plotH * i / 4;
+      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + plotW, gy); ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(148,163,184,.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padL - 6, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(X(0), padT + plotH + 4);
+    ctx.lineTo(X(0), padT - 10);
+    ctx.stroke();
+
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+    grad.addColorStop(0, 'rgba(251,191,36,.30)');
+    grad.addColorStop(1, 'rgba(251,191,36,.015)');
+
+    ctx.beginPath();
+    ctx.moveTo(X(-xm), Y(0));
+    for (let i = 0; i <= 140; i++){
+      const x = -xm + 2 * xm * i / 140;
+      ctx.lineTo(X(x), Y(0.5 * state.k * x * x));
+    }
+    ctx.lineTo(X(xm), Y(0));
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    for (let i = 0; i <= 140; i++){
+      const x = -xm + 2 * xm * i / 140;
+      const px = X(x), py = Y(0.5 * state.k * x * x);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.6;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(251,191,36,.55)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const E  = 0.5 * state.k * state.x * state.x;
+    const px = X(state.x);
+    const py = Y(E);
+
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(56,189,248,.75)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(px, Y(0)); ctx.lineTo(px, py); ctx.stroke();
+    if (E > 0.0001){
+      ctx.beginPath(); ctx.moveTo(X(0), py); ctx.lineTo(px, py); ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(px, py, 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fill();
+    ctx.strokeStyle = '#0b1120';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    if (state.animating && Math.abs(state.x0) > 0.001){
+      const px0 = X(state.x0);
+      ctx.save();
+      ctx.setLineDash([3, 5]);
+      ctx.strokeStyle = 'rgba(244,114,182,.55)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(px0, padT);
+      ctx.lineTo(px0, padT + plotH);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    [-xm, -xm / 2, 0, xm / 2, xm].forEach(v => {
+      ctx.fillText(v.toFixed(2), X(v), padT + plotH + 9);
+    });
+
+    ctx.fillStyle = 'rgba(148,163,184,.75)';
+    ctx.textAlign = 'right';
+    ctx.fillText('x (m)', padL + plotW, padT + plotH + 25);
+
+    const fmtE = v => (Emax >= 10 ? v.toFixed(1) : v.toFixed(2));
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    [0, 0.5, 1].forEach(f => {
+      const val = Emax * f;
+      ctx.fillText(fmtE(val), X(0) - 10, Y(val));
+    });
+
+    ctx.fillStyle = 'rgba(148,163,184,.75)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('E (J)', X(0) + 8, padT - 12);
+  }
+
+  /* ============================ Física ============================ */
+  let lastTime = performance.now();
+
+  function stepPhysics(dt){
+    const sub = 12;
+    const h = dt / sub;
+
+    for (let i = 0; i < sub; i++){
+      const a = (-state.k * state.x - state.c * state.v) / M;
+      const vOld = state.v;
+      state.v += a * h;
+      state.x += state.v * h;
+
+      const vAvg2 = 0.5 * (vOld * vOld + state.v * state.v);
+      state.Wr += state.c * vAvg2 * h;
+    }
+
+    if (Math.abs(state.x) > state.xMax){
+      state.x = Math.sign(state.x) * state.xMax;
+      state.v = 0;
+    }
+
+    if (state.c > 0 && Math.abs(state.x) < 0.003 && Math.abs(state.v) < 0.03){
+      state.x = 0;
+      state.v = 0;
+      state.animating = false;
+    }
+  }
+
+  /* ============================ Interfaz ============================ */
+  function updateReadouts(){
+    const F = -state.k * state.x;
+    const E = 0.5 * state.k * state.x * state.x;
+    const K = 0.5 * M * state.v * state.v;
+    const T = E + K;
+
+    valX.textContent = state.x.toFixed(2) + ' m';
+    valF.textContent = F.toFixed(1) + ' N';
+    valE.textContent = E.toFixed(2) + ' J';
+    valT.textContent = T.toFixed(2) + ' J';
+    valW.textContent = state.Wr.toFixed(2) + ' J';
+
+    outX.textContent = state.x.toFixed(2) + ' m';
+    outK.textContent = state.k + ' N/m';
+    outC.textContent = state.c.toFixed(1) + ' kg/s';
+    outS.textContent = state.speed.toFixed(2) + '×';
+
+    if (document.activeElement !== xSlider) xSlider.value = state.x;
+    if (document.activeElement !== sSlider) sSlider.value = state.speed;
+  }
+
+  function syncSpeedButtons(){
+    speedBtns.forEach(btn => {
+      const v = parseFloat(btn.dataset.speed);
+      btn.classList.toggle('active', Math.abs(v - state.speed) < 0.001);
+    });
+  }
+
+  let rafId = 0;
+  let paused = false;
+
+  function loop(now){
+    const realDt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+
+    const dt = realDt * state.speed;
+
+    if (state.animating){
+      const steps = Math.max(1, Math.ceil(state.speed));
+      for (let s = 0; s < steps; s++) stepPhysics(dt / steps);
+    }
+
+    updateReadouts();
+    drawStage();
+    drawGraph();
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  /* ============================ Eventos ============================ */
+  kSlider.addEventListener('input', e => {
+    state.k = parseFloat(e.target.value);
+  });
+
+  cSlider.addEventListener('input', e => {
+    state.c = parseFloat(e.target.value);
+    presetIdeal.classList.toggle('active', state.c === 0);
+    presetReal.classList.toggle('active', state.c > 0);
+  });
+
+  sSlider.addEventListener('input', e => {
+    state.speed = parseFloat(e.target.value);
+    syncSpeedButtons();
+  });
+
+  xSlider.addEventListener('input', e => {
+    state.animating = false;
+    state.v = 0;
+    state.x = parseFloat(e.target.value);
+    state.Wr = 0;
+    state.Einicial = 0;
+  });
+
+  speedBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.speed = parseFloat(btn.dataset.speed);
+      sSlider.value = state.speed;
+      syncSpeedButtons();
+    });
+  });
+
+  releaseBtn.addEventListener('click', () => {
+    if (Math.abs(state.x) < 0.002) return;
+    state.x0 = state.x;
+    state.v = 0;
+    state.Einicial = 0.5 * state.k * state.x * state.x;
+    state.Wr = 0;
+    state.animating = true;
+    lastTime = performance.now();
+  });
+
+  stopBtn.addEventListener('click', () => {
+    state.animating = false;
+    state.v = 0;
+  });
+
+  resetBtn.addEventListener('click', () => {
+    state.animating = false;
+    state.v = 0;
+    state.x = 0;
+    state.x0 = 0;
+    state.Wr = 0;
+    state.Einicial = 0;
+    state.k = 100;
+    state.c = 0;
+    state.speed = 1;
+    kSlider.value = 100;
+    cSlider.value = 0;
+    sSlider.value = 1;
+    xSlider.value = 0;
+    presetIdeal.classList.add('active');
+    presetReal.classList.remove('active');
+    syncSpeedButtons();
+    updateReadouts();
+  });
+
+  presetIdeal.addEventListener('click', () => {
+    state.c = 0;
+    cSlider.value = 0;
+    presetIdeal.classList.add('active');
+    presetReal.classList.remove('active');
+  });
+
+  presetReal.addEventListener('click', () => {
+    state.c = 2.5;
+    cSlider.value = 2.5;
+    presetReal.classList.add('active');
+    presetIdeal.classList.remove('active');
+  });
+
+  /* --------------------- Arrastre táctil / ratón --------------------- */
+  let dragOffset = 0;
+  let activePointerId = null;
+
+  function pointerPos(e){
+    const r = springCanvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function setFromPointer(mx){
+    const targetLeft = mx - dragOffset;
+    let nx = (targetLeft - geo.restEndX) / geo.scale;
+    nx = Math.max(-state.xMax, Math.min(state.xMax, nx));
+    state.x = nx;
+    state.v = 0;
+  }
+
+  // Margen táctil mayor en pantallas táctiles
+  function hitMargin(){
+    const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    return touch ? 28 : 16;
+  }
+
+  springCanvas.addEventListener('pointerdown', e => {
+    const p = pointerPos(e);
+    const m = hitMargin();
+    const halfH = geo.blockH / 2 + m;
+
+    if (p.x >= geo.blockX - m && p.x <= geo.blockX + geo.blockW + m &&
+        Math.abs(p.y - geo.cy) <= halfH){
+
+      state.animating = false;
+      state.v = 0;
+      state.dragging = true;
+      state.Wr = 0;
+      state.Einicial = 0;
+      dragOffset = p.x - geo.blockX;
+      activePointerId = e.pointerId;
+
+      try { springCanvas.setPointerCapture(e.pointerId); } catch(_){}
+      springCanvas.style.cursor = 'grabbing';
+      e.preventDefault();
+    }
+  });
+
+  springCanvas.addEventListener('pointermove', e => {
+    const p = pointerPos(e);
+
+    if (state.dragging && e.pointerId === activePointerId){
+      setFromPointer(p.x);
+      e.preventDefault();
+      return;
+    }
+
+    // Cambio de cursor solo en dispositivos con ratón
+    if (window.matchMedia && window.matchMedia('(hover: hover)').matches){
+      const m = hitMargin();
+      const halfH = geo.blockH / 2 + m;
+      const over = p.x >= geo.blockX - m && p.x <= geo.blockX + geo.blockW + m &&
+                   Math.abs(p.y - geo.cy) <= halfH;
+      springCanvas.style.cursor = over ? 'grab' : 'default';
+    }
+  });
+
+  function endDrag(e){
+    if (!state.dragging) return;
+    state.dragging = false;
+    activePointerId = null;
+    springCanvas.style.cursor = 'grab';
+    try { springCanvas.releasePointerCapture(e.pointerId); } catch(_){}
+  }
+
+  springCanvas.addEventListener('pointerup', endDrag);
+  springCanvas.addEventListener('pointercancel', endDrag);
+  springCanvas.addEventListener('lostpointercapture', () => {
+    state.dragging = false;
+    activePointerId = null;
+    springCanvas.style.cursor = 'grab';
+  });
+
+  // Evitar el menú contextual de pulsación larga sobre el canvas en móvil
+  springCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* ============================ Resize robusto ============================ */
+  function onResize(){
+    resizeCanvases();
+  }
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', () => {
+    // pequeño delay para que el navegador termine el cambio de layout
+    setTimeout(onResize, 120);
+  });
+
+  if (window.visualViewport){
+    window.visualViewport.addEventListener('resize', onResize);
+  }
+
+  if (typeof ResizeObserver !== 'undefined'){
+    const ro = new ResizeObserver(() => resizeCanvases());
+    ro.observe(springCanvas);
+    ro.observe(graphCanvas);
+    ro.observe(document.querySelector('.layout'));
+  }
+
+  // Pausar animación si la pestaña queda oculta (ahorro de batería)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden){
+      paused = true;
+      cancelAnimationFrame(rafId);
+    } else if (paused){
+      paused = false;
+      lastTime = performance.now();
+      rafId = requestAnimationFrame(loop);
+    }
+  });
+
+  /* ============================ Arranque ============================ */
+  resizeCanvases();
+  updateReadouts();
+  syncSpeedButtons();
+
+  requestAnimationFrame(() => {
+    resizeCanvases();
+    lastTime = performance.now();
+    rafId = requestAnimationFrame(loop);
+  });
+
+})();
+</script>
+</body>
+</html>
