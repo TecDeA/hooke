@@ -193,7 +193,9 @@
   .readouts{
     grid-column:1 / -1;
     display:grid;
-    grid-template-columns:repeat(5, minmax(0, 1fr));
+    /* 3 × 2: con 6 indicadores es la única disposición que evita
+       recortar etiquetas (el contenedor queda limitado a 1180 px) */
+    grid-template-columns:repeat(3, minmax(0, 1fr));
     gap:12px;
   }
 
@@ -226,6 +228,7 @@
   .card.x .value{ color:var(--cyan); }
   .card.f .value{ color:var(--pink); }
   .card.e .value{ color:var(--amber); }
+  .card.kin .value{ color:var(--violet); }
   .card.t .value{ color:var(--green); }
   .card.w .value{ color:var(--red); }
 
@@ -445,10 +448,9 @@
      RESPONSIVE — TABLETS (horizontal) y ventanas medianas
      ============================================================ */
   @media (max-width: 1000px){
-    .readouts{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
-    /* La tarjeta "Energía perdida" (etiqueta larga) ocupa 2 columnas
-       para evitar filas huérfanas y recortes de texto */
-    .readouts .card.w{ grid-column:span 2; }
+    /* 6 indicadores en 2 columnas × 3 filas: sin filas huérfanas
+       y con espacio sobrado para las etiquetas largas */
+    .readouts{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
   }
 
   /* ============================================================
@@ -471,7 +473,7 @@
     .controls, .graph-panel{ grid-column:1; }
     #springCanvas{ height:280px; }
     #graphCanvas{ height:230px; }
-    .readouts{ grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+    .readouts{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
   }
 
   @media (max-width: 560px){
@@ -498,6 +500,12 @@
     .chip{ padding:4px 10px; font-size:.66rem; }
   }
 
+  /* Pantallas muy estrechas: se ocultan las fórmulas de las
+     etiquetas (quedan los nombres, que es lo identificativo) */
+  @media (max-width: 430px){
+    .card .fx{ display:none; }
+  }
+
   /* ============================================================
      RESPONSIVE — MÓVILES EN HORIZONTAL (poca altura):
      readouts en una sola fila y lienzos que se adaptan al alto
@@ -507,8 +515,8 @@
     header p{ display:none; }
     .title-row{ margin-bottom:12px; }
     .title-row h1{ font-size:1.05rem; }
-    .readouts{ grid-template-columns:repeat(5, minmax(0, 1fr)); }
-    .readouts .card.w{ grid-column:auto; }
+    .readouts{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    .card .fx{ display:none; }
     #springCanvas{ height:clamp(150px, 38dvh, 200px); }
     /* Pantalla baja: se mantiene compacta (sin estirar hasta igualar
        los controles, que obligaría a hacer scroll) */
@@ -581,15 +589,19 @@
         <span class="value" id="valF">0.0 N</span>
       </div>
       <div class="card e">
-        <span class="label">Energía potencial · ½kx²</span>
+        <span class="label">Energía potencial <span class="fx">· ½kx²</span></span>
         <span class="value" id="valE">0.00 J</span>
       </div>
+      <div class="card kin">
+        <span class="label">Energía cinética <span class="fx">· ½mv²</span></span>
+        <span class="value" id="valK">0.00 J</span>
+      </div>
       <div class="card t">
-        <span class="label">Energía total · E + ½mv²</span>
+        <span class="label">Energía total <span class="fx">· E + ½mv²</span></span>
         <span class="value" id="valT">0.00 J</span>
       </div>
       <div class="card w">
-        <span class="label">Energía perdida · Wᵣ = ∫c·v²dt</span>
+        <span class="label">Energía perdida · Wᵣ <span class="fx">= ∫c·v²dt</span></span>
         <span class="value" id="valW">0.00 J</span>
       </div>
     </div>
@@ -704,6 +716,7 @@
   const valX     = document.getElementById('valX');
   const valF     = document.getElementById('valF');
   const valE     = document.getElementById('valE');
+  const valK     = document.getElementById('valK');
   const valT     = document.getElementById('valT');
   const valW     = document.getElementById('valW');
   const releaseBtn = document.getElementById('releaseBtn');
@@ -1230,6 +1243,7 @@
     valX.textContent = state.x.toFixed(2) + ' m';
     valF.textContent = F.toFixed(1) + ' N';
     valE.textContent = E.toFixed(2) + ' J';
+    valK.textContent = K.toFixed(2) + ' J';
     valT.textContent = T.toFixed(2) + ' J';
     valW.textContent = state.Wr.toFixed(2) + ' J';
 
