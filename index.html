@@ -151,7 +151,9 @@
     display:grid;
     grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
     gap:14px;
-    align-items:start;
+    /* stretch: los paneles de la misma fila (controles | gráfica)
+       igualan alturas → los bordes inferiores quedan alineados */
+    align-items:stretch;
   }
 
   .panel{
@@ -228,12 +230,23 @@
   .card.w .value{ color:var(--red); }
 
   .controls{ grid-column:1; min-width:0; }
-  .graph-panel{ grid-column:2; padding:8px 10px 4px; min-width:0; }
+
+  /* El panel de la gráfica se estira hasta igualar la columna de
+     controles (izquierda); el lienzo llena el panel con flex, de modo
+     que su borde inferior coincide con el del panel izquierdo. */
+  .graph-panel{
+    grid-column:2;
+    padding:8px 10px 4px;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+  }
 
   #graphCanvas{
     display:block;
     width:100%;
-    height:250px;
+    height:250px;      /* base; en 2 columnas flex la expande hasta llenar */
+    flex:1 1 auto;
     touch-action: manipulation;
   }
 
@@ -443,7 +456,8 @@
      ============================================================ */
   @media (min-width: 721px) and (max-width: 1000px) and (orientation: portrait){
     #springCanvas{ height:min(44dvh, 430px); }
-    #graphCanvas{ height:min(34dvh, 330px); }
+    /* #graphCanvas no necesita altura fija: llena el panel hasta
+       igualar la columna de controles (align-items:stretch + flex) */
   }
 
   /* ============================================================
@@ -496,7 +510,10 @@
     .readouts{ grid-template-columns:repeat(5, minmax(0, 1fr)); }
     .readouts .card.w{ grid-column:auto; }
     #springCanvas{ height:clamp(150px, 38dvh, 200px); }
-    #graphCanvas{ height:clamp(130px, 30dvh, 180px); }
+    /* Pantalla baja: se mantiene compacta (sin estirar hasta igualar
+       los controles, que obligaría a hacer scroll) */
+    .graph-panel{ align-self:start; }
+    #graphCanvas{ flex:0 0 auto; height:clamp(130px, 30dvh, 180px); }
     .ctl{ margin-bottom:12px; }
     .note{ display:none; }
   }
