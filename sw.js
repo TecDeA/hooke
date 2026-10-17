@@ -12,7 +12,7 @@
    La caché se invalida sola y el chip del título se actualizará
    dinámicamente mostrando "Actualizada · vX.Y.Z".
    ============================================================ */
-const VERSION = '1.0.0';
+const VERSION = '1.0.2';
 
 const CACHE_NAME = `muelle-v${VERSION}`;
 
