@@ -3,15 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Simulación interactiva de un muelle: ley de Hooke, energía potencial elástica, rozamiento y disipación de energía. Funciona sin conexión (PWA).">
 <meta name="theme-color" content="#0b1120">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Muelle">
+<meta name="application-name" content="Muelle interactivo">
+<meta name="msapplication-TileColor" content="#0b1120">
+
+<!-- PWA: manifiesto e iconos -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="img/favicon.ico" sizes="32x32">
+<link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+
 <title>Muelle interactivo — Fuerza, energía, rozamiento y velocidad</title>
 <style>
   *{ box-sizing:border-box; }
 
   :root{
+    color-scheme: dark;
+
     --bg:#0b1120;
     --panel:rgba(30,41,59,.72);
     --border:rgba(148,163,184,.16);
@@ -58,8 +72,19 @@
 
   .app{ max-width:1180px; margin:0 auto; }
 
-  header h1{
-    margin:0 0 6px;
+  /* ---------- Fila de título + chip de versión (PWA) ---------- */
+  .title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px 14px;
+    flex-wrap:wrap;
+    margin-bottom:6px;
+  }
+  .title-row h1{
+    margin:0;
+    flex:1 1 240px;
+    min-width:0;
     font-size:clamp(1.15rem, 4.5vw, 1.9rem);
     line-height:1.2;
     letter-spacing:-.02em;
@@ -68,6 +93,52 @@
     background-clip:text;
     color:transparent;
   }
+  .chip{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:5px 12px;
+    border-radius:999px;
+    border:1px solid rgba(56,189,248,.38);
+    background:rgba(56,189,248,.10);
+    color:#7dd3fc;
+    font-size:.72rem;
+    font-weight:700;
+    letter-spacing:.05em;
+    line-height:1;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+    max-width:100%;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  .chip .dot{
+    width:8px; height:8px;
+    border-radius:50%;
+    background:var(--muted);
+    flex:0 0 auto;
+  }
+  .chip.ready{ border-color:rgba(74,222,128,.42); background:rgba(74,222,128,.10); color:#86efac; }
+  .chip.ready .dot{ background:var(--green); box-shadow:0 0 8px rgba(74,222,128,.9); }
+  .chip.waiting{ border-color:rgba(251,191,36,.45); background:rgba(251,191,36,.10); color:#fcd34d; }
+  .chip.waiting .dot{
+    background:var(--amber);
+    box-shadow:0 0 8px rgba(251,191,36,.9);
+    animation:chipPulse 1.1s ease-in-out infinite;
+  }
+  .chip.error{ border-color:rgba(248,113,113,.42); background:rgba(248,113,113,.08); color:#fca5a5; }
+  .chip.error .dot{ background:var(--red); box-shadow:0 0 8px rgba(248,113,113,.8); }
+  .chip.flash{ animation:chipFlash .5s ease-in-out 3; }
+  @keyframes chipPulse{
+    0%,100%{ transform:scale(1); opacity:1; }
+    50%{ transform:scale(1.35); opacity:.55; }
+  }
+  @keyframes chipFlash{
+    0%,100%{ box-shadow:0 0 0 0 rgba(74,222,128,0); }
+    50%{ box-shadow:0 0 0 7px rgba(74,222,128,.22); }
+  }
+
   header p{
     margin:0 0 18px;
     color:var(--muted);
@@ -111,6 +182,10 @@
     -webkit-tap-highlight-color:transparent;
     cursor:grab;
     border-radius:12px;
+    outline:none;
+  }
+  #springCanvas:focus-visible{
+    box-shadow:0 0 0 2px var(--cyan);
   }
 
   .readouts{
@@ -187,21 +262,31 @@
   .ctl.c output{ color:var(--green); }
   .ctl.s output{ color:var(--violet); }
 
+  /* ------------------------------------------------------------
+     Sliders: carril fino pero con PULGAR Y ÁREA TÁCTIL GRANDES
+     (mejor ergonomía en móvil; el carril de 8 px queda centrado
+     dentro de un área táctil de 28 px)
+     ------------------------------------------------------------ */
   input[type=range]{
     -webkit-appearance:none;
     appearance:none;
     width:100%;
-    height:8px;
-    border-radius:4px;
-    background:linear-gradient(90deg,#334155,#475569);
+    height:28px;
+    background:transparent;
     outline:none;
-    margin:4px 0 0;
+    margin:2px 0 0;
     cursor:pointer;
     touch-action: manipulation;
   }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:8px;
+    border-radius:4px;
+    background:linear-gradient(90deg,#334155,#475569);
+  }
   input[type=range]::-webkit-slider-thumb{
     -webkit-appearance:none;
-    width:22px; height:22px;
+    width:24px; height:24px;
+    margin-top:-8px; /* centra el pulgar sobre el carril de 8 px */
     border-radius:50%;
     background:var(--cyan);
     border:3px solid #0b1120;
@@ -210,16 +295,22 @@
     cursor:grab;
   }
   input[type=range]::-webkit-slider-thumb:active{ cursor:grabbing; transform:scale(1.1); }
+  input[type=range]:focus-visible{
+    outline:2px solid var(--cyan);
+    outline-offset:2px;
+    border-radius:6px;
+  }
+  input[type=range]::-moz-range-track{
+    height:8px; border-radius:4px;
+    background:linear-gradient(90deg,#334155,#475569);
+  }
   input[type=range]::-moz-range-thumb{
-    width:16px; height:16px;
+    width:18px; height:18px;
     border-radius:50%;
     background:var(--cyan);
     border:3px solid #0b1120;
     box-shadow:0 0 0 2px var(--cyan);
     cursor:grab;
-  }
-  input[type=range]::-moz-range-track{
-    height:8px; border-radius:4px; background:#334155;
   }
 
   #cSlider::-webkit-slider-thumb{ background:var(--green); box-shadow:0 0 0 2px var(--green); }
@@ -338,10 +429,21 @@
   }
 
   /* ============================================================
-     RESPONSIVE — TABLETS
+     RESPONSIVE — TABLETS (horizontal) y ventanas medianas
      ============================================================ */
   @media (max-width: 1000px){
     .readouts{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    /* La tarjeta "Energía perdida" (etiqueta larga) ocupa 2 columnas
+       para evitar filas huérfanas y recortes de texto */
+    .readouts .card.w{ grid-column:span 2; }
+  }
+
+  /* ============================================================
+     RESPONSIVE — TABLETS EN VERTICAL: más lienzo aprovechable
+     ============================================================ */
+  @media (min-width: 721px) and (max-width: 1000px) and (orientation: portrait){
+    #springCanvas{ height:min(44dvh, 430px); }
+    #graphCanvas{ height:min(34dvh, 330px); }
   }
 
   /* ============================================================
@@ -379,19 +481,32 @@
     #graphCanvas{ height:195px; }
     .speed-row .speedbtn{ font-size:.62rem; padding:6px 1px; min-height:34px; }
     .presets button{ font-size:.72rem; padding:8px 4px; }
+    .chip{ padding:4px 10px; font-size:.66rem; }
   }
 
   /* ============================================================
-     RESPONSIVE — MÓVILES EN HORIZONTAL (poca altura)
+     RESPONSIVE — MÓVILES EN HORIZONTAL (poca altura):
+     readouts en una sola fila y lienzos que se adaptan al alto
      ============================================================ */
   @media (orientation: landscape) and (max-height: 520px){
     body{ padding-top: calc(10px + var(--sa-top)); }
     header p{ display:none; }
-    header h1{ font-size:1.05rem; margin-bottom:12px; }
-    #springCanvas{ height:190px; }
-    #graphCanvas{ height:170px; }
+    .title-row{ margin-bottom:12px; }
+    .title-row h1{ font-size:1.05rem; }
+    .readouts{ grid-template-columns:repeat(5, minmax(0, 1fr)); }
+    .readouts .card.w{ grid-column:auto; }
+    #springCanvas{ height:clamp(150px, 38dvh, 200px); }
+    #graphCanvas{ height:clamp(130px, 30dvh, 180px); }
     .ctl{ margin-bottom:12px; }
     .note{ display:none; }
+  }
+
+  /* ============================================================
+     MODO APP INSTALADA (PWA standalone): compactamos el margen
+     superior y respetamos las safe areas del sistema
+     ============================================================ */
+  @media (display-mode: standalone){
+    body{ padding-top: calc(12px + var(--sa-top)); }
   }
 
   /* ============================================================
@@ -401,7 +516,8 @@
     button{ min-height:46px; font-size:.9rem; }
     .speed-row .speedbtn{ min-height:42px; padding:9px 2px; font-size:.75rem; }
     .presets button{ min-height:46px; }
-    input[type=range]::-webkit-slider-thumb{ width:26px; height:26px; }
+    input[type=range]{ height:34px; }
+    input[type=range]::-webkit-slider-thumb{ width:28px; height:28px; margin-top:-10px; }
     input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
     .ctl{ margin-bottom:20px; }
   }
@@ -421,14 +537,21 @@
 <body>
 <div class="app">
   <header>
-    <h1>Muelle interactivo: fuerza, energía, rozamiento y velocidad</h1>
+    <div class="title-row">
+      <h1>Muelle interactivo: fuerza, energía, rozamiento y velocidad</h1>
+      <span class="chip waiting" id="versionChip" role="status" aria-live="polite"
+            title="Versión de la aplicación servida por el Service Worker">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="versionChipText">v…</span>
+      </span>
+    </div>
     <p>Arrastra el bloque para deformar el muelle. Ajusta <b>k</b>, el rozamiento <b>c</b> y la <b>velocidad de simulación</b>. Pulsa <b>Liberar</b> para ver la oscilación y comprueba cómo la energía disipada por rozamiento (Wᵣ) crece hasta igualar la energía inicial.</p>
   </header>
 
   <div class="layout">
 
     <section class="panel stage-panel">
-      <canvas id="springCanvas" aria-label="Simulación del muelle"></canvas>
+      <canvas id="springCanvas" aria-label="Simulación del muelle. Usa las flechas del teclado para deformar y espacio para liberar."></canvas>
     </section>
 
     <div class="readouts">
@@ -513,7 +636,9 @@
         por la fuerza de rozamiento. Con <code>c = 0</code> permanece en 0; con
         <code>c &gt; 0</code> crece monótonamente hasta igualar la energía mecánica inicial,
         que es cuando el bloque se detiene.<br><br>
-        <b>Balance energético:</b> <code>E_inicial = E_total + Wᵣ</code>.
+        <b>Balance energético:</b> <code>E_inicial = E_total + Wᵣ</code>.<br><br>
+        <b>Teclado:</b> flechas <code>←/→</code> deforman el muelle (<code>Shift</code> = paso
+        largo), <code>Espacio</code> libera, <code>Esc</code> detiene.
       </p>
     </section>
 
@@ -1209,6 +1334,27 @@
     presetIdeal.classList.remove('active');
   });
 
+  /* --------------------- Teclado (accesibilidad) --------------------- */
+  springCanvas.tabIndex = 0;
+  springCanvas.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+      e.preventDefault();
+      const step = e.shiftKey ? 0.05 : 0.005;
+      state.animating = false;
+      state.v = 0;
+      state.x = Math.max(-state.xMax,
+                Math.min(state.xMax, state.x + (e.key === 'ArrowRight' ? step : -step)));
+      state.Wr = 0;
+      state.Einicial = 0;
+    } else if (e.key === ' ' || e.key === 'Enter'){
+      e.preventDefault();
+      releaseBtn.click();
+    } else if (e.key === 'Escape'){
+      state.animating = false;
+      state.v = 0;
+    }
+  });
+
   /* --------------------- Arrastre táctil / ratón --------------------- */
   let dragOffset = 0;
   let activePointerId = null;
@@ -1327,6 +1473,18 @@
   });
 
   /* ============================ Arranque ============================ */
+
+  // Atajos del manifest: ./?preset=ideal | ./?preset=real
+  try {
+    const preset = new URLSearchParams(location.search).get('preset');
+    if (preset === 'ideal' || preset === 'real'){
+      state.c = (preset === 'real') ? 2.5 : 0;
+      cSlider.value = state.c;
+      presetIdeal.classList.toggle('active', state.c === 0);
+      presetReal.classList.toggle('active', state.c > 0);
+    }
+  } catch(_){}
+
   resizeCanvases();
   updateReadouts();
   syncSpeedButtons();
@@ -1337,6 +1495,99 @@
     rafId = requestAnimationFrame(loop);
   });
 
+})();
+
+/* ====================================================================
+   PWA — registro del Service Worker y CHIP DINÁMICO DE VERSIÓN
+   --------------------------------------------------------------------
+   · El chip del título pregunta su versión al SW vía postMessage.
+   · Estados:  v…  (cargando) · vX.Y.Z (controlado por el SW)
+               · "Actualizando…" (nuevo SW instalado)
+               · "Actualizada · vX.Y.Z" (parpadeo al aplicar una versión)
+               · "sin SW" si el navegador no soporta service workers.
+   ==================================================================== */
+(function(){
+  'use strict';
+
+  const chip     = document.getElementById('versionChip');
+  const chipText = document.getElementById('versionChipText');
+  let flashTimer = 0;
+
+  function setChip(mode, label){
+    if (!chip) return;
+    chip.classList.remove('ready', 'waiting', 'error', 'flash');
+    if (mode) chip.classList.add(mode);
+    chipText.textContent = label;
+  }
+
+  function showVersion(v){
+    if (!chip) return;
+    const prev = chip.dataset.v || '';
+    chip.dataset.v = v;
+    chip.title = 'Versión de la aplicación (Service Worker): ' + v;
+    if (prev && prev !== v){
+      // Nueva versión detectada → parpadeo informativo
+      setChip('ready', 'Actualizada · v' + v);
+      chip.classList.add('flash');
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => setChip('ready', 'v' + v), 2800);
+    } else {
+      setChip('ready', 'v' + v);
+    }
+  }
+
+  function askVersion(worker){
+    if (worker){
+      try { worker.postMessage({ type: 'GET_VERSION' }); } catch(_){}
+    }
+  }
+
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // Preguntamos al SW activo (o al que se esté instalando)
+      askVersion(navigator.serviceWorker.controller || reg.active || reg.waiting || reg.installing);
+
+      // Si hay un worker en espera (nuevo despliegue), lo activamos al momento
+      if (reg.waiting){
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        setChip('waiting', 'Actualizando…');
+      }
+
+      reg.addEventListener('updatefound', () => {
+        const incoming = reg.installing;
+        if (!incoming) return;
+        incoming.addEventListener('statechange', () => {
+          if (incoming.state === 'installed' && navigator.serviceWorker.controller){
+            setChip('waiting', 'Actualizando…');
+          }
+          if (incoming.state === 'activated'){
+            askVersion(incoming); // skipWaiting lo activa al instante
+          }
+        });
+      });
+    }).catch(() => setChip('error', 'sin SW'));
+
+    navigator.serviceWorker.addEventListener('message', e => {
+      const data = e.data || {};
+      if (data.type === 'VERSION' && data.version){
+        showVersion(String(data.version));
+      }
+    });
+
+    // Cuando un nuevo SW toma el control, pedimos su versión
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      setTimeout(() => askVersion(navigator.serviceWorker.controller), 50);
+    });
+
+    // Reintento por si el primer mensaje llegó demasiado pronto
+    setTimeout(() => {
+      if (chip && !chip.dataset.v){
+        askVersion(navigator.serviceWorker.controller);
+      }
+    }, 1200);
+  } else {
+    setChip('error', 'sin SW');
+  }
 })();
 </script>
 </body>
